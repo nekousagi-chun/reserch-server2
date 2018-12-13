@@ -8,25 +8,25 @@ filename =datetime.now().strftime("%Y%m%d%H%M")
 ipdict = {}
 
 def ip_count(src,window,ipdict):
-    if window < 400:
+    if window < 400:#もしwindowサイズが400以下ならばipdictに追加する
         if src not in ipdict:
             ipdict[src] = 1
         else:
             ipdict[src] = ipdict[src] + 1
 
 def write_ipfw(ipdict):
-    for i in ipdict.keys():
+    for i in ipdict.keys():#ipdictを読み込んで行く
         print("=================")
         print(i, ipdict[i])#ipアドレスと出現回数
         print("=================")
         if ipdict[i] == 10:
             cmd = "ufw insert 1 deny from {}".format(i)
             subprocess.run(shlex.split(cmd))
-            print("=================")
+            print("~~~~~~~~~~~~~~~~~")
             print(i, ipdict[i])
-            print("=================")
+            print("~~~~~~~~~~~~~~~~~")
 
-    print(ipdict)
+    #print(ipdict)
 def packet_show(packet):
     ip_count(packet[IP].src,packet[TCP].window,ipdict)
     write_ipfw(ipdict)
