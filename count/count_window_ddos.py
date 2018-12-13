@@ -3,14 +3,21 @@ import sys
 from datetime import datetime
 import subprocess
 import shlex
+import os
+import shutil
 
 filename =datetime.now().strftime("%Y%m%d%H%M")
+window_value =datetime.now().strftime("window_%Y%m%d%H%M")
 ipdict = {}
 ufw_rule = []
 
 #ウィンドウサイズが400以下の情報を辞書型にして記録していく
 def ip_count(src,window,ipdict):
-    if window < 400:
+    if 512 <= window <= 1024:
+        with open(os.path.join("/home/k598254/count/result_window",window_value),'a') as file:
+            file.write(str(src) + "," + \
+                       str(window) + "\n")
+        print(src, window)
         if src not in ipdict:
             ipdict[src] = 1
         else:
@@ -39,7 +46,7 @@ def packet_show(packet):
 
         tcp_param = ["sport","dport","seq","ack","dataofs","reserved","flags","window","chksum","urgptr"]
 
-        with open(filename,'a') as file:
+        with open(os.path.join("/home/k598254/count/result",filename),'a') as file:
             file.write(str(packet[IP].version) + "," + \
                    str(packet[IP].ihl) + "," + \
                    str(packet[IP].tos) + "," + \
@@ -68,9 +75,11 @@ def packet_show(packet):
 
 
 if __name__ == '__main__':
-    with open(filename,'w') as file:
+    with open(os.path.join("/home/k598254/count/result",filename),'w') as file:
         print("version,ihl,tos,len,id,flags,frag,ttl,proto,chksum,src,dst,sport,dport,seq,ack,dataofs,reserved,flags,window,chksum,urgptr", file = file)
-
+    # with open(window_value,'w') as file:
+    with open(os.path.join("/home/k598254/count/result_window",window_value),'w') as file:
+        print("src,window", file = file)
     
     sniff(filter="tcp and not src host 10.1.200.100", count = 1000, iface="ens160", prn=packet_show)
 
