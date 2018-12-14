@@ -5,12 +5,17 @@ import subprocess
 import shlex
 
 filename =datetime.now().strftime("%Y%m%d%H%M")
+window_value =datetime.now().strftime("window_%Y%m%d%H%M")
 ipdict = {}
 ufw_rule = []
 
 #ウィンドウサイズが400以下の情報を辞書型にして記録していく
 def ip_count(src,window,ipdict):
 #    if window < 400:
+    with open(os.path.join("/home/k598254/count/result_window",window_value),'a') as file:
+            file.write(str(src) + "," + \
+                       str(window) + "\n")
+    print(src, window)
     if src not in ipdict:
         ipdict[src] = 1
     else:
@@ -68,10 +73,11 @@ def packet_show(packet):
 
 
 if __name__ == '__main__':
-    with open(filename,'w') as file:
-        print("version,ihl,tos,len,id,flags,frag,ttl,proto,chksum,src,dst,sport,dport,seq,ack,dataofs,reserved,flags,window,chksum,urgptr,options", file = file)
+    with open(os.path.join("/home/k598254/count/result",filename),'w') as file:
+        print("version,ihl,tos,len,id,flags,frag,ttl,proto,chksum,src,dst,sport,dport,seq,ack,dataofs,reserved,flags,window,chksum,urgptr", file = file)
 
-    
-    sniff(filter="tcp and not src host 10.1.200.100", count = 1000, iface="ens160", prn=packet_show)
+    with open(os.path.join("/home/k598254/count/result",window_value),'w') as file:
+        print("src,window",file = file) 
+    sniff(filter="tcp and not src host 10.1.200.100 and not src 10.1.6.20", count = 1000, iface="ens160", prn=packet_show)
 
     print(ipdict)
