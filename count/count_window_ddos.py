@@ -13,20 +13,38 @@ ufw_rule = []
 
 #ウィンドウサイズが400以下の情報を辞書型にして記録していく
 def ip_count(src,window,ipdict):
-    if 512 <= window <= 1024:
+    if src not in ipdict:
+        ipdict[src] = 0
+
+    if window < 3157:
+        ipdict[src] = ipdict[src] + 1
         with open(os.path.join("/home/k598254/count/result_window",window_value),'a') as file:
             file.write(str(src) + "," + \
-                       str(window) + "\n")
+                       str(window) + "," + \
+                       str(ipdict[src]) + "\n")
+    else:
+        ipdict[src] = 0
+
+
+"""
+    if window < 3157:
         print(src, window)
         if src not in ipdict:
             ipdict[src] = 1
         else:
             ipdict[src] = ipdict[src] + 1
 
+        with open(os.path.join("/home/k598254/count/result_window",window_value),'a') as file:
+            file.write(str(src) + "," + \
+                       str(window) + "," + \
+                       str(ipdict[src]) + "\n")
+     else:
+        ipdict[src] = 0
+"""
 #辞書型に記録された情報から，同じIPアドレスが10回観測された場合はufwの設定をする
 def write_ipfw(ipdict):
     for i in ipdict.keys():
-        if ipdict[i] == 10 and not i in ufw_rule:
+        if ipdict[i] >= 170 and not i in ufw_rule:
             cmd = "ufw insert 1 deny from {}".format(i)
             print(cmd)
             subprocess.run(shlex.split(cmd))
@@ -79,8 +97,8 @@ if __name__ == '__main__':
         print("version,ihl,tos,len,id,flags,frag,ttl,proto,chksum,src,dst,sport,dport,seq,ack,dataofs,reserved,flags,window,chksum,urgptr", file = file)
     # with open(window_value,'w') as file:
     with open(os.path.join("/home/k598254/count/result_window",window_value),'w') as file:
-        print("src,window", file = file)
+        print("src,window,count", file = file)
     
-    sniff(filter="tcp and not src host 10.1.200.100", count = 1000, iface="ens160", prn=packet_show)
+    sniff(filter="tcp and not src host 10.1.200.100", iface="ens160", prn=packet_show)
 
     print(ipdict)
