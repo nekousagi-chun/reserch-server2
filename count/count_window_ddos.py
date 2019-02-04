@@ -1,104 +1,92 @@
 from scapy.all import *
-import sys
-from datetime import datetime
-import subprocess
-import shlex
-import os
-import shutil
 
-filename =datetime.now().strftime("%Y%m%d%H%M")
-window_value =datetime.now().strftime("window_%Y%m%d%H%M")
+from datetime import datetime
+import csv
+import os
+import shlex
+import shutil
+import subprocess
+import sys
+
+FILENAME = datetime.now().strftime("%Y%m%d%H%M")
+FILENAME_WINDOW = datetime.now().strftime("window_%Y%m%d%H%M")
+LOG_DIR = os.path.join(os.environ["HOME"], "count/result_window")
+ALL_LOG_DIR = os.path.join(os.environ["HOME"], "count/result")
+THRESHOLD = 3157
+IFACE = "ens160"
+
 ipdict = {}
 ufw_rule = []
 
-#ウィンドウサイズが400以下の情報を辞書型にして記録していく
-def ip_count(src,window,ipdict):
+ip_param = ["version", "ihl", "tos", "len", "id", "flags",
+            "frag", "ttl", "proto", "chksum", "src", "dst"]
+tcp_param = ["sport", "dport", "seq", "ack", "dataofs",
+             "reserved", "flags", "window", "chksum", "urgptr"]
+
+def ip_count(src, window):
+    # itemsになければ初期値0で追加
     if src not in ipdict:
         ipdict[src] = 0
-
-    if window < 3157:
+    # ウィンドウサイズが閾値以下ならば+1
+    if window < THRESHOLD:
         ipdict[src] = ipdict[src] + 1
-        with open(os.path.join("/home/k598254/count/result_window",window_value),'a') as file:
-            file.write(str(src) + "," + \
-                       str(window) + "," + \
-                       str(ipdict[src]) + "\n")
+        with open(os.path.join(LOG_DIR, FILENAME_WINDOW), 'a') as f:
+            w = csv.writer(f, lineterminator='\n')
+            w.writerow([src, window, ipdict[src]])
+            print("FILENAME_WINDOWに書き込む")
+        write_ufw(src)
     else:
+    #ウィンドウサイズが閾値以上ならばvaluesを0で初期化
         ipdict[src] = 0
 
 
-"""
-    if window < 3157:
-        print(src, window)
-        if src not in ipdict:
-            ipdict[src] = 1
-        else:
-            ipdict[src] = ipdict[src] + 1
+def write_ufw(src):
+    # 辞書型に記録された情報itemsで，valuesが170回以上観測された場合はufwの設定をする
+    if ipdict[src] >= 170 and src not in ufw_rule:
+        cmd = "ufw insert 1 deny from {}".format(src)
+        print(cmd)
+        subprocess.run(shlex.split(cmd))
+        print("------------------")
+        print(src,ipdict[src])
+        print("------------------")
+        ufw_rule.append(src)
 
-        with open(os.path.join("/home/k598254/count/result_window",window_value),'a') as file:
-            file.write(str(src) + "," + \
-                       str(window) + "," + \
-                       str(ipdict[src]) + "\n")
-     else:
-        ipdict[src] = 0
-"""
-#辞書型に記録された情報から，同じIPアドレスが10回観測された場合はufwの設定をする
-def write_ipfw(ipdict):
-    for i in ipdict.keys():
-        if ipdict[i] >= 170 and not i in ufw_rule:
-            cmd = "ufw insert 1 deny from {}".format(i)
-            print(cmd)
-            subprocess.run(shlex.split(cmd))
-            print("------------------")
-            print(i, ipdict[i])
-            print("------------------")
-            ufw_rule.append(i)
 
-#パケットの内容をcsv形式で記録していく
 def packet_show(packet):
-    ip_count(packet[IP].src,packet[TCP].window,ipdict)
-    write_ipfw(ipdict)
-
+    # パケットの内容をcsv形式で記録していく
+    ip_count(packet[IP].src, packet[TCP].window)
     try:
-
-        ip_param = ["version","ihl","tos","len","id","flags","frag","ttl","proto","chksum","src","dst"]
-
-        tcp_param = ["sport","dport","seq","ack","dataofs","reserved","flags","window","chksum","urgptr"]
-
-        with open(os.path.join("/home/k598254/count/result",filename),'a') as file:
-            file.write(str(packet[IP].version) + "," + \
-                   str(packet[IP].ihl) + "," + \
-                   str(packet[IP].tos) + "," + \
-                   str(packet[IP].len) + "," + \
-                   str(packet[IP].id) + "," + \
-                   str(packet[IP].flags) + "," + \
-                   str(packet[IP].frag) + "," + \
-                   str(packet[IP].ttl) + "," + \
-                   str(packet[IP].proto) + "," + \
-                   str(packet[IP].chksum) + "," + \
-                   str(packet[IP].src) + "," + \
-                   str(packet[IP].dst) + "," + \
-                   str(packet[TCP].sport) + "," + \
-                   str(packet[TCP].dport) + "," + \
-                   str(packet[TCP].seq) + "," + \
-                   str(packet[TCP].ack) + "," + \
-                   str(packet[TCP].dataofs) + "," + \
-                   str(packet[TCP].reserved) + "," + \
-                   str(packet[TCP].flags) + "," + \
-                   str(packet[TCP].window) + "," + \
-                   str(packet[TCP].chksum) + "," + \
-                   str(packet[TCP].urgptr) + "\n")
+        with open(os.path.join(ALL_LOG_DIR, FILENAME), 'a') as f:
+            w = csv.writer(f, lineterminator='\n')
+            w.writerow([packet[IP].version, packet[IP].ihl, packet[IP].tos,
+                        packet[IP].len, packet[IP].id, packet[IP].flags,
+                        packet[IP].frag, packet[IP].ttl, packet[IP].proto,
+                        packet[IP].chksum, packet[IP].src, packet[IP].dst,
+                        packet[TCP].sport, packet[TCP].dport, packet[TCP].seq,
+                        packet[TCP].ack, packet[TCP].dataofs,
+                        packet[TCP].reserved, packet[TCP].flags,
+                        packet[TCP].window, packet[TCP].chksum,
+                        packet[TCP].urgptr])
 
     except IndexError:
         print("--TCP nothing---")
 
 
-if __name__ == '__main__':
-    with open(os.path.join("/home/k598254/count/result",filename),'w') as file:
-        print("version,ihl,tos,len,id,flags,frag,ttl,proto,chksum,src,dst,sport,dport,seq,ack,dataofs,reserved,flags,window,chksum,urgptr", file = file)
-    # with open(window_value,'w') as file:
-    with open(os.path.join("/home/k598254/count/result_window",window_value),'w') as file:
-        print("src,window,count", file = file)
-    
-    sniff(filter="tcp and not src host 10.1.200.100", iface="ens160", prn=packet_show)
+def main():
+    header = ip_param + tcp_param
+
+    with open(os.path.join(ALL_LOG_DIR, FILENAME), 'w') as f:
+        w = csv.writer(f, lineterminator='\n')
+        w.writerow(header)
+
+    with open(os.path.join(LOG_DIR, FILENAME_WINDOW), 'w') as f:
+        w = csv.writer(f, lineterminator='\n')
+        w.writerow(["src", "window", "count"])
+
+    sniff(filter="tcp and not src host 10.1.200.100",iface=IFACE, prn=packet_show)
 
     print(ipdict)
+
+
+if __name__ == '__main__':
+    main()
